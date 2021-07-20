@@ -1,0 +1,168 @@
+---
+title: "assignment2"
+author: "문지원_20182480"
+date: '2021 3 25 '
+output: html_document
+---
+
+
+<br/>
+
+#### 1.먼저 ID와 ZIP.code는 feature에서 제외한다. 그리고 z-score normalization을 활용하여 모든 feature들의 scale을 일치시킨다. 첫 4000명의 데이터를 training set으로, 나머지 1000명의 데이터를 test set으로 사용하고 training set과 test set에서 target variable의 분포를 비교해보자
+<br/>
+
+```{r message=FALSE} 
+# 사용할 패키지 추가
+library(ggplot2)
+library(caret)
+library(class)
+```
+
+```{r graph1}
+# 데이터파일 읽기
+data <- read.csv("CommonBank.csv")
+str(data)
+
+# remove feature
+data <- data[,-1]
+data <- data[,-4]
+str(data)
+
+# target variable factor로 바꾸기
+data$PersonalLoan <- factor(data$PersonalLoan, levels=c("0","1"),labels = c("Reject","Accept"))
+
+# z-score normalization
+normalize <- function(x){
+  return((x-mean(x))/sd(x))
+}
+
+data_n <- as.data.frame(lapply(data[c(1:7,9:12)],normalize))
+str(data_n)
+
+#creating training and test data
+data_train <- data_n[1:4000,]
+data_test <- data_n[4001:5000,]
+
+#create labels for training and test data
+data_train_labels <- data[1:4000,8]
+data_test_labels <- data[4001:5000,8]
+str(data_train_labels)
+str(data_test_labels)
+
+# training set과 test set에서 target variable의 분포를 비교
+train_table <- table(data_train_labels)
+barplot(train_table, main="train set에서 target variable의 분포") 
+
+test_table <- table(data_test_labels)
+barplot(test_table,main="test set에서 target variable의 분포") 
+
+# Conclusion: training set과 test set 에서의 target variable 분포가 비슷함
+
+```
+<br/>
+
+#### 2. 5-NN 적용하고, 결과 분석 
+
+<br/>
+```{r graph2}
+
+data_test_pred <- knn(train=data_train,test=data_test,
+                      cl=data_train_labels, k=5)
+
+confusionMatrix(data_test_pred,data_test_labels)
+
+# 모델 성능 report
+# Confusion Matrix 에서 Accuracy가 0.962가 나옴 
+```
+
+<br/>
+
+#### 3.Training set 중에서 마지막 800명의 데이터를 validation set으로 사용하여, 다양한 k값에 대해 k-NN을 적용해 보고 예측 성능을 비교해 보자. k가 어떤 값을 가질 때 모델의 성능이 가장 우수한가?
+<br/>
+
+```{r graph3}
+library(caret)
+# train data, val data
+data_train_new <- data_n[1:3200,]
+data_train_val <- data_n[3201:4000,]
+data_val_labels <- data[3201:4000,8]
+
+#set seed
+set.seed(123)
+
+accuracy_k <- NULL
+# knn training
+for(kk in c(1:99)){
+  
+  data_test_pred <- knn(train=data_train_new,test=data_train_val,
+                      cl=data_train_labels[1:3200], k=kk)
+  
+  accuracy_k <- c(accuracy_k,sum(data_test_pred==data_val_labels)/length(data_val_labels))
+}
+valid_k <- data.frame(k=c(1:99),accuracy=accuracy_k)
+
+#k에 따른 정확도 그래프 
+plot(formula = accuracy~k,
+     data=valid_k,type="o",pch=20)
+
+#labeling
+with(valid_k, text(accuracy~k, labels=rownames(valid_k),pos=1,cex=0.5))
+
+# Conclusion : k=1일때 accuracy가 가장 높다. 그러나 일반적으로 k=1을 자주 사용하지 않기 때문에 그다음으로 높은 k=5를 사용하는 것이 좋을 것 같다.
+
+```
+
+<br/>
+
+#### 4.Training set에 대해 5-fold cross validation을 5회 반복하여 best k값을 찾아보자. Best k 값으로 만들어지는 최종 model에 test set을 적용하여 model의 성능을 report하자. 
+
+<br/>
+
+```{r graph4}
+
+# train, test data
+data_train_cv <-data[1:4000,]
+data_test_cv <- data[4001:5000,]
+
+# 5-fold cross validation 5회 반복 설정 
+cv2 <- trainControl(method="repeatedcv",number = 5,repeats = 5)
+
+#z-normalized
+z_normalized <- c("center","scale")
+
+# set seed
+set.seed(123)
+
+#parameter tuning
+tune_grid <- expand.grid(k=seq(1,99,2))
+
+#knn fitting
+knn_fit <- train(data=data_train_cv,PersonalLoan~.,method="knn",trControl=cv2,preProcess=z_normalized,tuneGrid = tune_grid)
+
+knn_fit
+
+#plot
+ggplot(knn_fit)+theme_bw()
+
+# Conclusion : k=3일때 accuracy가 가장 높다
+
+# 최종 모델에 적용
+test_pred <- predict(knn_fit, data_test_cv)
+confusionMatrix(test_pred,data_test_labels)
+
+# 모델 성능 report
+#k=3 을 적용하였을 때 Confusion Matrix 에서 Accuracy가 0.967이 나옴
+
+```
+
+<br/>
+
+#### 5.3번과 4번에서 활용한 training 방식의 장단점을 비교해보자. 
+
+<br/>
+```{r graph5}
+# 3번 문제에서는 validation set을 train set의 마지막 800개로 하나로만 고정해서 평가했다. 
+# 그러나 3번 문제 처럼 하나로만 고정해서 성능을 평가하면 하나의 validation set에 대해overfitting 되었을 우려가 있다. 
+
+# 5번 문제는 전체 데이터 셋을 k개의 subset으로 나누고 k번의 평가를 실행한다. 3번 문제와는 달리 validation set을 중복없이 바꾸어가면서 평가를 실행한다. 따라서 과적합을 줄일 수 있다. 또한 5-fold cross validation을 5번 반복함으로써 예측 정확도를 더 높일 수 있다. 
+```

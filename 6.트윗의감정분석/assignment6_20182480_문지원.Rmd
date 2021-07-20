@@ -1,0 +1,310 @@
+---
+title: "assignment6_20182480_문지원"
+author: "문지원_20182480"
+date: '2021 5 26 '
+output:
+  html_document: 
+    highlight: pygments
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<br/>
+
+### [Sentiment Analysis on Twitter Dataset]
+<br/>
+
+```{r message=FALSE}
+# 라이브러리 추가 
+library(caret)
+library(ISLR)
+library(rsample)
+library(rpart)
+library(rpart.plot)
+library(psych)
+library(glmnet)
+library(dplyr)
+library(e1071)
+library(dslabs)
+library(mlbench)
+library(randomForest)
+library(wordcloud)
+library(tm)
+library(SnowballC)
+library(vip)
+```
+
+<br/>
+
+#### 1.모델을 수립하기 전에 데이터의 특성을 분석한다. 시각화 도구를 적절히 활용하자. 
+<br/>
+```{r message=FALSE}
+#read data
+dat <- read.csv("Tweets_win.csv",stringsAsFactors = FALSE)
+str(dat)
+dat <- dat[,c(2,11)]
+str(dat)
+
+#visualization
+
+# target 변수 factor로 변환 
+dat$airline_sentiment <- factor(dat$airline_sentiment)
+str(dat)
+
+# target 변수의 분포 확인
+tb <- table(dat$airline_sentiment)
+plot(tb, main="airline sentiment의 분포")
+
+# negative neutral positive 분리
+negative <- subset(dat,airline_sentiment=="negative")
+neutral <- subset(dat,airline_sentiment=="neutral")
+positive <- subset(dat, airline_sentiment=="positive")
+
+# wordcloud 생성
+wordcloud(negative$text,max.words = 40,colors=brewer.pal(8,"Dark2"))
+wordcloud(neutral$text,max.words = 40,colors=brewer.pal(8,"Dark2"))
+wordcloud(positive$text,max.word = 40,colors=brewer.pal(8,"Dark2"))
+```
+<br/>
+**-결과해석 **
+<br/>
+Airline sentiment의 분포를 table을 만들어 plot 해본 결과, 세가지 감정의 분포가 일정하지 않고 negative 변수의 분포가 neutral과positive 변수보다 월등히 높은 것을 확인할 수 있다.
+<br/>
+또한 wordcloud를 이용하여 텍스트에 빈번하게 등장하는 단어를 시각화 해 보았다. negative한 트윗에넌 flight, usairways,cancelled,hold등이 빈번하게 등장함을 알 수 있고, neutral한 트윗에는 united, americanair,jetblue 등이 빈번하게 등장함을 알 수 있고, positive한 트윗에는 thanks, southwestair, great 등이 빈번하게 등장함을 알 수 있다. 
+<br/>
+
+#### 2. 텍스트 데이터에 bag-of-words 기법을 적용하기 위해 적절한 preprocessing을 수행하고, 그 결과를 분석해보자.
+<br/>
+```{r message=FALSE}
+#create corpus 
+dat_corpus <- VCorpus(VectorSource(dat$text))
+dat_corpus
+
+#100번째 document 확인
+inspect(dat_corpus[[110]])
+
+#대문자 소문자로 변환 
+dat_corpus_clean <- tm_map(dat_corpus,content_transformer(tolower))
+dat_corpus_clean[[110]]$content
+
+#숫자 제거 
+dat_corpus_clean <- tm_map(dat_corpus_clean,removeNumbers)
+dat_corpus_clean[[110]]$content
+
+#stopword(불용어)제거
+dat_corpus_clean <- tm_map(dat_corpus_clean,removeWords,stopwords())
+dat_corpus_clean[[110]]$content
+
+#문장부호 제거
+dat_corpus_clean <- tm_map(dat_corpus_clean,removePunctuation)
+dat_corpus_clean[[110]]$content
+
+#단어들의 어미 제거(stemming)
+dat_corpus_clean <- tm_map(dat_corpus_clean,stemDocument)
+dat_corpus_clean[[110]]$content
+
+#공백 제거
+dat_corpus_clean <- tm_map(dat_corpus_clean,stripWhitespace)
+dat_corpus_clean[[110]]$content
+
+
+```
+<br/>
+**-결과해석 **
+<br/>
+효과적인 데이터 분석을 위해 텍스트의 대문자를 소문자로 변환하고, 숫자를 제거하고, 불용어를 제거하고, 문장부호를 제거하고, 단어들의 어미를 제거하고, 공백을 제거하는 preprocessing을 수행한다.  
+<br/>
+
+#### 3. 계산시간을 줄이기 위해 첫 5,000개의 데이터만 training set으로 사용하고, 나머지 모든 데이터럴 test set으로 사용한다. Training set을 사용하여 predictive model을 만들어보자.
+<br/>
+**DTM 사용하여 predictive model 만듦(DTM으로 최적 기법 선택한 후 그 기법 내에서 DTM과 TF-IDF 적용할 지 선택할 것임) **
+<br/>
+```{r message=FALSE}
+# create dtm
+dat_dtm <- DocumentTermMatrix(dat_corpus_clean)
+dat_dtm
+
+inspect(dat_dtm[1:5,1:10])
+
+#전체 documnet 중에 0.5% 미만의 document에서 발생하는 단어는 제외
+dat_dtm2 <- removeSparseTerms(dat_dtm,0.995)
+dat_dtm2
+
+#preprocessing 끝난 dtm을 데이터프레임으로 변환 
+data <- data.frame(as.matrix(dat_dtm2))
+
+#feature 이름 적당한 형태로 조정
+colnames(data) <- make.names(colnames(data))
+str(data)
+
+#target 변수 추가
+data$airline_sentiment <-dat$airline_sentiment
+
+#데이터셋 분할  
+data_train <- data[1:5000,]
+data_test <- data[5001:14640,]
+
+```
+<br/>
+
+#### A) 지금까지 학습한 모델을 최대한 활용해보고, 분석 과정과 결과를 report하자. 사용하는 모델, 모델에 포함되는 파라미터에 대한 튜닝, 모델에 포함되는 feature의 수, DTM/TF-IDF 사용 여부 등이 classification accuracy에 영향을 미칠 수 있다. 
+<br/>
+
+**k-NN algorithm 사용**
+<br/>
+```{r message=FALSE}
+
+set.seed(123)
+knn_fit <- train(data=data_train, airline_sentiment~., method="knn", trControl = trainControl(method="cv", number = 5), preProcess = c("center", "scale"), tuneGrid = data.frame(k = seq(1, 30, 2)))
+knn_fit
+
+#plot 
+ggplot(knn_fit) + theme_bw()
+
+
+```
+<br/>
+**-결과해석 **
+<br/>
+k-NN 알고리즘을 사용하여 cross validation을 이용해 피팅한 결과 k=19일때가 accuracy가 0.6252로 가장 높음을 확인할 수 있다. 
+<br/>
+
+**Logistic Regression algorithm 사용(일반적으로 lasso regression이 ridge regression 보다 우수하므로 lasso regression 사용) **
+<br/>
+```{r message=FALSE}
+# Create feature matrix
+trainX <- model.matrix(airline_sentiment~., data=data_train)[,-1]
+trainY <- data_train$airline_sentiment
+
+#Lasso Regression cross validation
+set.seed(123)
+lasso_model <- cv.glmnet(x=trainX , y=trainY, alpha=1, family="multinomial",type.measure="class",nfolds=5)
+plot(lasso_model)
+
+#print performance measure
+lasso_model$cvm
+
+# misclassification error가 0.28보다 작으면서 feature의 개수가 가장 적은 모델 선택 -> 29번째 labmda 
+lambda <- lasso_model$lambda[29]
+coef(lasso_model, s = lambda)
+
+prob_lasso = predict(lasso_model,newx = model.matrix(airline_sentiment~.,data=data_train)[,-1],s=lambda,type="response")
+pred_lasso = predict(lasso_model,newx = model.matrix(airline_sentiment~.,data=data_train)[,-1],s=lambda,type="class")
+
+confusionMatrix(factor(pred_lasso,levels=c("negative","neutral","positive")),data_train$airline_sentiment)
+```
+<br/>
+**-결과해석 **
+<br/>
+misclassification error 가 0.28보다 작으면서 feature의 개수가 가장 적은 모델을 선택하기 위해 29번째 lambda 값을 선택하여 logistic regression을 선택하였다. confusion matrix로 train set에 대한 accuracy를 계산했을 때 accuracy가 0.7368로 k-NN 알고리즘을 사용했을 때 보다 우수한 것을 확인할 수 있다. 
+<br/>
+
+**SVM algorithm 사용(RBF kernel이 대부분의 경우 다른 kernel에 비해 좋은 성능보이므로 RBF kernel 선택) **
+<br/>
+```{r message=FALSE}
+# RBF Kernel
+set.seed(123)
+tune.out2 <- tune(svm,airline_sentiment~.,data=data_train,kernel="radial",ranges=list(cost=c(0.1,1,10),gamma=c(0.1,1,10)))
+summary(tune.out2)
+plot(tune.out2)
+ypred <- predict(tune.out2$best.model,newdata=data_train)
+confusionMatrix(ypred,data_train$airline_sentiment)
+```
+<br/>
+**-결과해석 **
+<br/>
+SVM algorithm의 모든 kernel의 성능을 비교하기에는 수행시간이 너무 오래 걸리기 때문에 일반적으로 성능이 가장 우수하다고 알려진 RBF kernel을 선택하였다. parameter tuning 결과, cost=1이고 gamma=0.1일때 성능이 가장 우수하다는 것을 알 수 있다. 해당 parameter을 바탕으로 svm을 적용했을 때 accuracy는 0.8078으로 logistic regression을 적용했을 때 보다 성능이 우수한 것을 확인할 수 있다. 
+<br/>
+
+**Random forest algorithm 사용(일반적으로 random forest가 decision tree보다 성능이 좋기 때문에 decision tree 생략함)**
+<br/>
+```{r message=FALSE}
+#training set에 bagging 적용
+set.seed(123)
+bag <- randomForest(airline_sentiment~.,data=data_train,mtry=330)
+
+#tree 개수에 따른 bagging model의 out-of-bag MSE 계산
+OOB_bag <-bag$err.rate[,"OOB"]
+plot(OOB_bag,col="darkblue")
+
+#random forest 생성
+set.seed(123)
+rf_class <- randomForest(airline_sentiment~.,data=data_train) 
+
+#plot
+OOB_rf<-rf_class$err.rate[,"OOB"]
+plot(OOB_rf,col="darkred")
+
+# 두 그래프 비교
+plot_data <- data.frame(x=1:500, bag=OOB_bag, rf=OOB_rf)
+ggplot(plot_data, aes(x=x)) + geom_point(aes(y=bag), color="darkred", alpha=0.5, size=0.5) + geom_point(aes(y=rf), color="darkblue", alpha=0.5, size=0.5) + labs(x="# of trees", y="OOB classification error")
+
+pred_bag <- predict(bag,newdata=data_train,type="class")
+cf<-confusionMatrix(pred_bag,data_train$airline_sentiment)
+cf
+```
+<br/>
+**-결과해석 **
+<br/>
+bagging 모델과 random forest algorithm의 OOB error rate을 그래프로 비교했을 때 bagging 모델의 OOB classification error가 적음을 알 수 있다. 이를 근거로 bagging 모델이 더 성능이 우수하다고 판단한다. bagging 모델의 accuracy를 계산했을 때 정확도는 0.9764로 svm 알고리즘을 사용했을 때 보다 성능이 우수함을 알 수 있다. 
+<br/>
+
+**Random forest bagging model을 TF-IDF 적용했을 때와 비교 **
+```{r message=FALSE}
+dat_tfidf <- weightTfIdf(dat_dtm)
+
+#전체 documnet 중에 0.5% 미만의 document에서 발생하는 단어는 제외
+dat_tfidf2 <- removeSparseTerms(dat_tfidf,0.995)
+dat_tfidf2
+
+#preprocessing 끝난 dtm을 데이터프레임으로 변환 
+data2 <- data.frame(as.matrix(dat_tfidf2))
+
+#feature 이름 적당한 형태로 조정
+colnames(data2) <- make.names(colnames(data2))
+
+#target 변수 추가
+data2$airline_sentiment <-dat$airline_sentiment
+str(data2)
+
+#데이터셋 분할  
+data2_train <- data2[1:5000,]
+data2_test <- data2[5001:14640,]
+
+#training set에 bagging 적용
+set.seed(123)
+bag2 <- randomForest(airline_sentiment~.,data=data2_train,mtry=330)
+
+#accuracy 비교 
+pred_bag2 <- predict(bag2,newdata=data2_train,type="class")
+cf2<-confusionMatrix(pred_bag2,data2_train$airline_sentiment)
+cf2
+```
+<br/>
+**-결과해석 **
+<br/>
+지금까지의 모델은 DTM을 적용했을 때의 accuracy를 계산한 것이다. DTM 을 적용했을 때와 TF-IDF을 적용했을 때 무엇이 더 우수할까를 비교하기 위해 최종 선택된 bagging 모델의 데이터를 TF-IDF를 적용한 데이터로 교체하여 accuracy를 비교하여 준다. TF-IDF을 적용했을 때의 confusion matrix 결과 accuracy가 0.9842로 DTM을 적용했을 때보다 정확도가 높음을 확인할 수 있다. 따라서 bagging 모델에 TF-IDF를 적용한 모델을 최종 선택해준다. 
+<br/>
+
+#### B) 최종적으로 선택한 모델은 무엇이며 test set에 대한 accuracy는 얼마인가? --> 최종 선택 : Random Forest bagging 모델 TF_IDF 적용했을 때
+<br/>
+```{r message=FALSE}
+pred_bag_f <- predict(bag2,newdata=data2_test,type="class")
+confusionMatrix(pred_bag_f,data2_test$airline_sentiment)
+```
+<br/>
+**-결과해석 **
+<br/>
+test set에 대해 confusion matrix를 만들어 accuracy를 구해본 결과 정확도가 0.5567로 train했을때의 정확도에 비해 크게 뒤떨어짐을 알 수 있다. 
+<br/>
+
+#### C) 세 class(positive,negative,neutral)중에서 어떤 class를 분류하기 어려운가? -> negative 분류어려움 
+<br/>
+**-결과해석 **
+<br/>
+confusion matrix에서 세가지 class의 sensitivity를 비교했을 때 negative class의 sensitivity가 0.5046으로 가장 낮음을 알 수 있다. 따라서 negative class의 분류가 가장 어렵다. 
+<br/>
+

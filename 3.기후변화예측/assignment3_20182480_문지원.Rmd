@@ -1,0 +1,323 @@
+---
+title: "assignment3_20182480_문지원"
+author: "문지원_20182480"
+date: '2021 4 10 '
+output:
+  html_document: 
+    highlight: pygments
+  pdf_document: default
+
+---
+
+<br/>
+
+### [Climate Change]
+
+#### 1.Year 및 Month를 제외한 9개의 변수들 간의 상관 관계를 다양한 그래프를 활용하여 시각화해보고, 이로부터 데이터의 특성을 분석해보자
+<br/>
+
+```{r message=FALSE} 
+# read data
+Climate <- read.csv("ClimateChange.csv")
+str(Climate)
+
+# Remove Feature
+Climate <- Climate[,-1]
+Climate <- Climate[,-1]
+str(Climate)
+
+# 상관관계 시각화
+library(psych)
+pairs.panels(Climate[c("MEI","CO2","CH4","N2O","CFC.11","CFC.12","TSI","Aerosols","Temp")])
+
+```
+-- **데이터 특성 분석:**
+
+상관계수가 0,5보다 크거나 -0.5보다 작으면 두 변수가 상관성이 높다고 판단할 수 있다. 따라서 CO2와 CH4, CO2와 N2O, CO2와 CFC.11,CH4와 N2O, CH4와 CFC.11,CH4와 CFC.12,CH4와 Temp , N2O와 CFC.12, N2O와 Temp, CFC.11 와 CFC.12, CFC.12와 Temp 등이 서로 상관성이 높다. 
+
+<br/>
+
+#### 2. 2004년 이후의 데이터를 test set으로 2003년까지의 데이터를 training set으로 분할하자. 그리고 training set을 활용하여 linear regression model을 수립하자. 이때 8개의 feature 변수 모두 포함시킨다.
+
+<br/>
+
+```{r message=FALSE} 
+# train set 
+Climate_train <- Climate[1:248,]
+
+# test set
+Climate_test <- Climate[249:308,]
+
+# linear regression model
+model1 <- lm(Temp~., data= Climate_train)
+summary(model1)
+
+# feature importance
+library(vip)
+vip(model1)
+```
+
+-- **어떠한 feature들이 Temp에 큰 영향을 미치는가?**
+
+MEI,Aerosols,TSI,CFC.11,CFC.12,CO2,N2O가 통계적으로 유의하며, 순서대로 Temp에 끼치는 영향도가 크다
+
+-- **N2O와 CFC-11은 지구의 지표면에서 우주로 발산하는 적외선 복사열을 흡수하여 지구 표면의 온도를 상승시키는 역할을 하는 온실가스로 알려져 있다. 모델에서 N2O와 CFC-11 변수의 coefficient는 양수 값을 가지는가? 음수 값을 가지는가? 만약 음수값을 가진다면 N2O와 CFC-11의 양이 증가할수록 평균 기온이 감소한다는 것을 의미하므로 일반적인 지식과 모순된다. 이러한 모순된 결과가 도출되는 원인은 무엇일까?**
+
+모델에서 N20와 CFC-11 변수의 coefficient는 모두 음수 값을 가진다.따라서 N2O와 CFC-11양이 증가할수록 평균기온이 감소한다는 것을 의미하는데 이는 일반적인 지식과 모순된다.이러한 모순된 결과가 도출되는 원인은 다른 양의 coefficient 값을 가지는 변수들의 영향력이 더 강하기 때문일 것이라고 생각한다. 
+
+<br/>
+
+#### 3. MEI, TSI, Aerosols, N2O 4개의 feature만 사용하여 regression model을 만들어보자. 
+
+<br/>
+
+```{r message=FALSE} 
+model2 <- lm(Temp ~ MEI+TSI+Aerosols+N2O, data=Climate_train)
+summary(model2)
+
+```
+-- **N2O 변수의 coefficient를 2번 모델과 비교해 보자.**
+
+N2O 변수의 끼치는 영향력이 2번 모델보다 커졌다. 
+
+-- **두 모델의 R squred 값, Adjusted R squared 값, test set error (test set에 대한 RMSE)를 비교해보자. 어떤 모델을 선택하겠는가?**
+
+R-squared 는 회귀모델에서 독립변수가 종속변수를 얼마만큼 설명해 주는지를 가리키는 지표이다. 따라서 독립변수의 수가 증가하면 상승한다. 그러나 종속변수를 잘 설명하지 못하는 변수가 추가되어도 증가하기 때문에 Adjusted R-sqaured 값을 이용한다. Adjusted R-Squared 값은 독립변수의 개수가 증가하더라도 일방적인 증가를 방지한다. 
+
+2번 모델에서는 R-squared 값이 0.7133, Adjusted R-squared 값이 0.7037이다. 3번 모델에서는 R-squared 값이 0.6799, Adjusted R-squared 값이 0.6747이다. 
+
+두 모델의 R-Squared 값을 비교했을 때, 3번 모델이 feature 개수가 4개로 줄어들어 모델이 훨씬 단순해졌음에도 Adjusted R-Squared 값에 큰 차이가 없다. 또한 미래의 데이터에 대한 예측을 하는 test error는 Adjusted R-squared 값과 반비례하는 경향이 있다. 따라서 test error는 2번 문제보다 3번문제에서 더 클 것이라고 예측할 수 있다. 그러나 두 모델의 Adjusted R-squared 값이 차이가 크지 않기 때문에 test error의 차이도 크지 않다.  따라서단순성과 정확성 모두를 고려하였을 때 3번과 같은 feature 4개가 포함된 모델을 선택할 것이다. 
+
+<br/>
+
+#### 4. 8개의 feature를 대상으로 cross validation을 활용한 stepwise variable selection을 수행해보자.
+
+<br/>
+
+```{r message=FALSE} 
+library(caret)
+library(leaps)
+# Forward Stepwise selection
+set.seed(123)
+fwd_model4 <- train(Temp~., data= Climate_train, method="leapForward", tuneGrid = data.frame(nvmax= 1:9),trControl=trainControl(method="repeatedcv",number=10,repeats = 5))
+
+fwd_model4
+
+ggplot(fwd_model4)
+
+# Backward Stepwise Selection
+set.seed(123)
+bwd_model4 <- train(Temp~., data= Climate_train, method="leapBackward", tuneGrid = data.frame(nvmax= 1:9),trControl=trainControl(method="repeatedcv",number=10,repeats = 5))
+
+bwd_model4
+
+ggplot(bwd_model4)
+
+# forward selection의 coefficient
+coef_fwd_cv4 <- coef(fwd_model4$finalModel,fwd_model4$bestTune$nvmax)
+coef_fwd_cv4
+```
+-- **Forward selection과 backward selection의 결과를 비교해보자**
+
+Forward selection과 backward selection에서의 nvmax 결과가 동일하다.
+
+-- **Prediction accuracy와 Model interpretability를 종합적으로 고려하여 best모델을 하나 결정하자.**
+
+Predition Accuracy와 Model Interpretability를 모두 고려할 때 적은 feature 수로 높은 성능을 갖는 모델을 결정하는 것이 좋다. Forward와 Backward selection 모두 7개의 feature를 선택한다는 결론이 나왔기 때문에 아무거나 선택해주었다.
+
+
+<br/>
+
+#### 5. Prediction accuracy를 높이기 위해, 기존 8개의 feature들 외에 feature들 사이의 모든 iteraction effect, 그리고 CO2, CFC.11, CFC.12의 제곱항들을 모두 추가한 모델을 대상으로 cross validation을 활용한 stepwise variable selection을 수행해보자. 
+
+<br/>
+
+```{r message=FALSE} 
+# Forward selection
+set.seed(123)
+fwd_model5 <- train(Temp~(.)^2+I(CO2^2)+I(CFC.11^2)+I(CFC.12^2), data= Climate_train, method="leapForward",tuneGrid= data.frame(nvmax = 1:40), trControl = trainControl(method="repeatedcv",number =10, repeats = 5))
+
+fwd_model5
+ggplot(fwd_model5)
+
+# Backward selection
+set.seed(123)
+bwd_model5 <- train(Temp~(.)^2+I(CO2^2)+I(CFC.11^2)+I(CFC.12^2), data= Climate_train, method="leapBackward",tuneGrid= data.frame(nvmax = 1:40), trControl = trainControl(method="repeatedcv",number =10, repeats = 5))
+
+bwd_model5
+ggplot(bwd_model5)
+
+# Rmse가 더 작은 Forward Selection 의 coefficient
+coef_fwd_cv5 <- coef(fwd_model5$finalModel,fwd_model5$bestTune$nvmax)
+coef_fwd_cv5
+```
+-- **Forward selection과 backward selection의 결과를 비교해보자**
+
+Forward selection에서는 14개의 feature를 선택, backward selection에서는 20개의 feature를 선택한다. 
+
+-- **Cross validated RMSE가 가장 낮은 best모델을 결정하자. 어떠한 변수들이 best 모델에 포함되는가**
+
+Forward selection에서 nvmax가 14일때 RMSE가 0.0845, backward selection에서 nvmax가 20일때 0.0856 이므로 Forward selection에서 nvmax가 14일때 cross validated RMSE가 가장 낮다. 
+
+결과적으로 MEI, TSI, MEI:CO2 , MEI:CFC.11 ,  MEI:CFC.12,  CO2:CH4, CO2:N2O , CO2:CFC.12, CO2:Aerosols , CH4:CFC.11 , CH4:Aerosols, CFC.11:CFC.12 , CFC.11:Aerosols , CFC.12:Aerosols 변수들이 포함된다. 
+
+<br/>
+
+#### 6. 2,3,4,5번에서 수립된 4개의 모델에 대해서 test set (2004년 이후 데이터)에 대한 prediction accuracy(RMSE)를 비교해보자. 예상한 대로 결과가 나오는가? 그렇지 않다면 그 원인은 무엇일지 분석해보자.
+
+<br/>
+
+```{r message=FALSE} 
+# No2 RMSE
+pred_model2 <- predict(model1,Climate_test)
+RMSE(pred_model2, Climate_test$Temp)
+
+# No3 RMSE
+pred_model3 <- predict(model2, Climate_test)
+RMSE(pred_model3,Climate_test$Temp)
+
+# No4 RMSE 
+pred_model4_fwd <- predict(fwd_model4,Climate_test)
+RMSE(pred_model4_fwd,Climate_test$Temp)
+
+# No5 RMSE
+pred_model5_fwd <- predict(fwd_model5,Climate_test)
+RMSE(pred_model5_fwd,Climate_test$Temp)
+```
+-- **결과 해석**
+
+예상한바와 다르다. 8개의 feature들의 iteraction을 고려하고 model selection을 한 5번 문제에서 가장 RMSE가 낮을 것이라 예측했었는데 제일 RMSE가 높은 결과가 나왔다. 
+
+아마도 이러한 원인은 Model에 포함된 feature의 수가 너무 많아, model 복잡도가 높아져 variance가 급격하게 증가하여 overfitting이 발생했기 때문이다. 
+
+<br/>
+
+### [Regression on Simulated Data]
+
+<br/>
+
+#### 랜덤 데이터 생성
+
+<br/>
+
+```{r message=FALSE} 
+
+# vector X 생성
+set.seed(1)
+X <- rnorm(200,0,1)
+
+# vector E 생성
+set.seed(2)
+E <- rnorm(200,0,4)
+
+# target vector Y 생성
+Y <- 1+2*X-3*X^2+4*X^3+E
+```
+
+<br/>
+
+#### 1.X,X2,X3...X10 의 10개 변수를 feature로, Y를 target으로 설정하자. 이때 feature 변수들과 target변수 사이의 상관관계를 시각화해보자.
+
+<br/>
+
+```{r message=FALSE} 
+# data frame 생성
+df <- data.frame(X,X^2,X^3,X^4,X^5,X^6,X^7,X^8,X^9,X^10,Y)
+str(df)
+
+# 상관관계 시각화
+pairs.panels(df[c("X","X.2","X.3","X.4","X.5","X.6","X.7","X.8","X.9","X.10","Y")])
+
+
+```
+-- **결과 해석**
+
+X와 Y의 상관계수는 0.81로 상관성이 높다.
+<br/>
+X.2와 Y는 상관계수가 0이므로 상관성이 없다.
+<br/>
+X.3과 Y의 상관계수는 0.88로 상관성이 높다.
+<br/>
+X.4와 Y의 상관계수는 0.12로 상관성이 낮다.
+<br/>
+X.5과 Y의 상관계수는 0.79로 상관성이 높다.
+<br/>
+X.6과 Y의 상관계수는 0.19로 상관성이 낮다. 
+<br/>
+X.7과 Y의 상관계수는 0.7로 상관성이 높다.
+<br/>
+X.8과 Y의 상관계수는 0.24로 상관성이 낮다. 
+<br/>
+X.9와 Y의 상관계수는 0.63으로 상관성이 높다.
+<br/>
+X.10과 Y의 상관계수는 0.26으로 상관성이 낮다. 
+
+<br/>
+
+#### 2. 10개의 feature를 모두 포함하는 linear regression model을 만들어보자. 통계적으로 유의한 변수가 있는가? regression coefficient B hat 값을 실제 B와 비교해보자.
+
+<br/>
+
+```{r message=FALSE} 
+# train test split
+library(rsample)
+
+# linear regression
+model2_2 <- lm(Y~., data= df)
+summary(model2_2)
+```
+-- **결과 해석**
+
+통계적으로 유의한 변수는 X,X.5,X.7,X.9이다. regression coefficient 값을 실제와 비교했을 때 같다고 말할 수 없다. 
+
+<br/>
+
+#### 3. X,X2,X3의 3개 변수를 feature로, Y를 target으로 linear regression model을 만들엉보자. 모든 feature들이 통계적으로 유의한가? regression coefficient B hat 값을 실제 B와 비교해보자.
+
+<br/>
+
+```{r message=FALSE} 
+# 새로운 데이터 프레임 생성 
+df2 <- data.frame(X,X^2,X^3,Y)
+
+# linear regression
+model2_3 <- lm(Y~., data= df2)
+summary(model2_3)
+
+```
+-- **결과 해석**
+
+모든 변수들이 통계적으로 유의하다는 결론이 나왔다. 또한 coefficient 값이 실제(1,2,-3,4)와  유사하다고 볼 수 있다.
+
+<br/>
+
+#### 4. X,X2,...X10의 10개 변수를 feature로, Y를 target으로 Lasso regression model을 만들어 본다. Cross Validation으로 최적의 모델을 찾아보자. 이 모델에는 어떤 변수가 포함되었는가? regression coefficient 값을 실제 B값과 비교해보자. 그리고 결과를 바탕으로 Lasso regression의 효과에 대해서 설명해보자.
+
+<br/>
+
+```{r message=FALSE} 
+
+library(glmnet)
+
+# feature matrix 생성
+featureX <- model.matrix(Y~.,df)[,-1]
+targetY <- df$Y
+
+# lasso regression에대한 cross validation
+set.seed(123)
+cv_lasso <- cv.glmnet(x=featureX, y=targetY, alpha=1, nfolds=10 )
+plot(cv_lasso)
+
+cv_lasso
+
+# find best lambda
+best_lambda_lasso <- cv_lasso$lambda.min
+best_lambda_lasso
+
+# final model
+lasso_full <- glmnet(x=featureX, y= targetY, alpha=1)
+predict(lasso_full,s=best_lambda_lasso,type="coefficients")[1:11,]
+```
+-- **결과 해석**
+
+이 모델에는 변수 X, X^2, X^3, X^4 가 선택되어있다. 추정된 coefficient는 (1.363,2.137,-3.372,3.965,-0.02) 이며 실제(1,2,-3,4,0)과 매우 유사하다. 따라서 올바른 variable selection을 수행했다고 볼 수 있다. 
