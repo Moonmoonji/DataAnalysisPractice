@@ -1,4 +1,4 @@
-## Summary 
+## Summary 1
 
 2004년 1월동안 Washington DC 지역으로부터 New York City로 운행한 2201개의 항공기 운행 기록 데이터로부터 항공기 연착(delay)여부 예측 
 
@@ -54,3 +54,22 @@ Darkred : 기본 logistic regression model
 Darkblue : backward stepwise selection 적용한 logistic regression model 
 
 Darkgreen : lasso regression 적용한 logistic regression model 
+
+## Summary 2
+
+Citrus Hiil과 Minute Maid Orange juice 구매한 1070명 고객 정보 포함된 데이터에서 feature Purchase의 두가지 factor 중 어떤것을 구매할지 예측하는 모델 (SVM 사용) 
+
+### linear kernel SVM 
+![image](https://user-images.githubusercontent.com/87505072/130911809-23e0204a-3dc6-494f-9f98-54efb0c0f688.png)
+
+### RBF kernel SVM 
+![image](https://user-images.githubusercontent.com/87505072/130911968-77f99d52-51e4-4d64-89eb-1e34b9235cdc.png)
+![image](https://user-images.githubusercontent.com/87505072/130911999-ffe174ea-e73f-48ca-958a-a49e5640a756.png)
+
+### polynomial kernel SVM 
+![image](https://user-images.githubusercontent.com/87505072/130912060-cb0fd9bd-2eb0-4153-b7e3-8773d80465ff.png)
+
+## Conclusion
+세가지 kernel에 대해서 parameter tuning을 진행한 결과 linear kernel이 cost가 0.01일때 가장 좋은 성능을 보임 
+![image](https://user-images.githubusercontent.com/87505072/130912625-b370203a-0c71-45cf-82ca-5c6fd495d7d7.png)
+
