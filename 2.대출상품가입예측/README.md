@@ -1,4 +1,4 @@
-### Summary 
+## Summary 
 
 k-NN을 활용하여 새로운 고객의 정보가 주어졌을 때 이 고객이 개인 대출 상품을 가입할 지를 예측 
 
@@ -19,7 +19,7 @@ k=3 일때 accuracy 가장 높음
 
 모델에 적용 
 
-### Concolusion
+## Concolusion
 
 #### Accuracy 비교
 
