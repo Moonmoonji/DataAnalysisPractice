@@ -1,6 +1,6 @@
 ---
-title: "assignment1_20182480_문지원"
-author: "문지원_20182480"
+title: "지하철유동인구시각화"
+author: "문지원"
 date: '2021 3 18 '
 output:
   html_document: default
