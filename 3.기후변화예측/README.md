@@ -7,8 +7,6 @@
 
 CO2, CH4, N2O, CFC.12 등의 feature 변수들이 Target 변수인 Temp와 강한 양의 상관관계 갖고, 이들 feature 변수들끼리도 매우 높은 상관관계 
 
----
-
 ### linear regression model 수립 
 ![image](https://user-images.githubusercontent.com/87505072/130895650-51183a49-ca60-4c07-8851-2e906a70559a.png)
 
