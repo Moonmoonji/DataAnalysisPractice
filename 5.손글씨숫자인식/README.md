@@ -46,5 +46,5 @@ MNIST 데이터셋에서 숫자 분류하는 image classification model 만들�
 #### bagging model 
 ![image](https://user-images.githubusercontent.com/87505072/130916631-065532aa-dd9c-403d-a804-a0acad60e5f6.png)
 
-#### randomg forest 
+#### random forest model
 ![image](https://user-images.githubusercontent.com/87505072/130916668-236dd982-5749-4042-962b-8237e593650f.png)
